@@ -1,2 +1,2 @@
 sample,tumor_bam,normal_bam
-TESTSAMPLE,/mnt/d/Proyecto_nf/FlorPio-gatk-cnv-somatic/test_data/tumor.bam,/mnt/d/Proyecto_nf/FlorPio-gatk-cnv-somatic/test_data/normal.bam
+TESTSAMPLE,/mnt/d/FlorPio-gatk-cnv-somatic/test_data/tumor.bam,/mnt/d/FlorPio-gatk-cnv-somatic/test_data/normal.bam
