@@ -1,0 +1,3 @@
+sample,tumor_bam,normal_bam
+patient01,/path/to/bams/patient01_T.recal.bam,/path/to/bams/patient01_N.recal.bam
+patient02,/path/to/bams/patient02_T.recal.bam,/path/to/bams/patient02_N.recal.bam
