@@ -224,3 +224,4 @@ local.config
 *.backup
 *~
 
+assets/samplesheet_real.csv
