@@ -1,0 +1,226 @@
+# ==========================================
+# NEXTFLOW
+# ==========================================
+.nextflow*
+.nextflow.log*
+work/
+results/
+null/
+timeline*.html
+report*.html
+trace*.txt
+dag*.html
+.nextflow.pid
+
+# ==========================================
+# USER DATA - CRITICAL: Never commit real data
+# ==========================================
+# Real samplesheets (keep only templates)
+samplesheet.csv
+my_*.csv
+*_samples.csv
+samples_*.csv
+real_*.csv
+local_*.csv
+
+# Parameter files with local paths
+params.json
+my_params.json
+local_params.json
+*_params.json
+
+# Data directories
+data/
+raw_data/
+test_data/
+testing/
+testing*/
+
+# ==========================================
+# BIOINFORMATICS FILES - Large/Sensitive
+# ==========================================
+# Sequence files
+*.bam
+*.bai
+*.sam
+*.cram
+*.crai
+*.fastq
+*.fastq.gz
+*.fq
+*.fq.gz
+
+# Reference files
+*.fa
+*.fasta
+*.fna
+*.fa.fai
+*.fasta.fai
+*.dict
+
+# VCF files
+*.vcf
+*.vcf.gz
+*.vcf.gz.tbi
+*.vcf.idx
+*.bcf
+
+# CNV-specific files
+*.hdf5
+*.pon.hdf5
+*.counts.hdf5
+*.tsv
+*.seg
+*.called.seg
+*.modelFinal.seg
+*.cr.seg
+*.denoisedCR.tsv
+*.standardizedCR.tsv
+*.allelicCounts.tsv
+
+# Interval files
+*.interval_list
+*.bed
+*.bed.gz
+
+# Images/Plots (if generated during dev)
+*.png
+*.pdf
+*.jpg
+*.jpeg
+*.svg
+
+# ==========================================
+# CONTAINERS
+# ==========================================
+*.img
+*.sif
+singularity/
+docker-compose.override.yml
+
+# ==========================================
+# LOGS & TEMPORARY FILES
+# ==========================================
+*.log
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+logs/
+*.out
+*.err
+
+# ==========================================
+# R
+# ==========================================
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+*.Rproj
+.Rproj.user/
+
+# ==========================================
+# Python
+# ==========================================
+*.pyc
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+env/
+venv/
+ENV/
+.venv
+*.egg-info/
+dist/
+build/
+
+# ==========================================
+# IDE & EDITORS
+# ==========================================
+# VSCode
+.vscode/
+*.code-workspace
+
+# IntelliJ / PyCharm
+.idea/
+*.iml
+*.iws
+
+# Vim
+*.swp
+*.swo
+*~
+.*.swp
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ==========================================
+# OPERATING SYSTEMS
+# ==========================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.Trash-*
+.nfs*
+
+# ==========================================
+# SECRETS & CREDENTIALS
+# ==========================================
+secrets/
+*.secret
+*.key
+*.pem
+credentials.json
+.env
+.env.local
+
+# ==========================================
+# LOCAL CONFIGURATIONS
+# ==========================================
+config/local.config
+conf/local.config
+conf/my_*.config
+local.config
+
+# ==========================================
+# PROJECT-SPECIFIC
+# ==========================================
+# Keep only template configs, not actual configs
+# (templates use .template extension)
+!*.template.json
+!*.template.config
+!*.example.csv
+
+# Archive files (if you compress data)
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# Backup files
+*.bak
+*.backup
+*~
+

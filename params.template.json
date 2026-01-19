@@ -1,0 +1,10 @@
+{
+  "fasta": "/path/to/genome/hg38.fa",
+  "fai": "/path/to/genome/hg38.fa.fai",
+  "dict": "/path/to/genome/hg38.dict",
+  "intervals": "/path/to/intervals/preprocessed.interval_list",
+  "pon": "/path/to/pon/panel_of_normals.hdf5",
+  "common_snps": "/path/to/snps/common_snps.vcf.gz",
+  "mane_annotation": "/path/to/annotation/exons_mane.txt",
+  "annotate_script": "bin/annotate_cnvs_complete.R"
+}
