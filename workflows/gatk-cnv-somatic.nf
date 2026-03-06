@@ -196,7 +196,7 @@ workflow GATK_CNV_SOMATIC {
         ANNOTATE_CNV(
             ch_annotate_input,
             file(params.mane_annotation),
-            file(params.annotate_script)
+            file(params.genes_list)
         )
         ch_versions = ch_versions.mix(ANNOTATE_CNV.out.versions.first())
     }
