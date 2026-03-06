@@ -2,7 +2,7 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/FlorPio/gatk-cnv-somatic/master/nextflow_schema.json",
     "title": "FlorPio/gatk-cnv-somatic pipeline parameters",
-    "description": "Analysis of CNV and LOH in tumor-paired samples",
+    "description": "Nextflow pipeline for somatic Copy Number Variant discovery using GATK",
     "type": "object",
     "$defs": {
         "input_output_options": {
@@ -16,9 +16,9 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "schema": "assets/schema_input.json",
                     "mimetype": "text/csv",
                     "pattern": "^\\S+\\.csv$",
+                    "schema": "assets/schema_input.json",
                     "description": "Path to comma-separated file containing information about the samples in the experiment.",
                     "help_text": "You will need to create a design file with information about the samples in your experiment before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 3 columns, and a header row.",
                     "fa_icon": "fas fa-file-csv"
@@ -26,56 +26,138 @@
                 "outdir": {
                     "type": "string",
                     "format": "directory-path",
-                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+                    "description": "The output directory where the results will be saved. You have to use absolute paths to store on Cloud infrastructure.",
                     "fa_icon": "fas fa-folder-open"
                 }
             }
         },
-        "institutional_config_options": {
-            "title": "Institutional config options",
+        "reference_genome_options": {
+            "title": "Reference genome options",
             "type": "object",
-            "fa_icon": "fas fa-university",
-            "description": "Parameters used to describe centralised config profiles. These should not be edited.",
-            "help_text": "The centralised nf-core configuration profiles use a handful of pipeline parameters to describe themselves. This information is then printed to the Nextflow log when you run a pipeline. You should not need to change these values when you run a pipeline.",
+            "fa_icon": "fas fa-dna",
+            "description": "Reference genome files required for the analysis.",
+            "required": ["fasta", "fai", "dict", "intervals", "pon", "common_snps"],
             "properties": {
-                "custom_config_version": {
+                "fasta": {
                     "type": "string",
-                    "description": "Git commit id for Institutional configs.",
-                    "default": "master",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to FASTA genome reference file (hg38 main chromosomes).",
+                    "fa_icon": "fas fa-font",
+                    "help_text": "Must be the same reference used to create the Panel of Normals."
                 },
-                "custom_config_base": {
+                "fai": {
                     "type": "string",
-                    "description": "Base directory for Institutional configs.",
-                    "default": "https://raw.githubusercontent.com/nf-core/configs/master",
-                    "hidden": true,
-                    "help_text": "If you're running offline, Nextflow will not be able to fetch the institutional config files from the internet. If you don't need them, then this is not a problem. If you do need them, you should download the files from the repo and tell Nextflow where to find them with this parameter.",
-                    "fa_icon": "fas fa-users-cog"
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to FASTA index file (.fai).",
+                    "fa_icon": "fas fa-file"
                 },
-                "config_profile_name": {
+                "dict": {
                     "type": "string",
-                    "description": "Institutional config name.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to sequence dictionary file (.dict).",
+                    "fa_icon": "fas fa-file"
                 },
-                "config_profile_description": {
+                "intervals": {
                     "type": "string",
-                    "description": "Institutional config description.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to preprocessed interval list for target regions.",
+                    "fa_icon": "fas fa-list",
+                    "help_text": "Picard or GATK-style interval list. For WES, these are the exome capture targets."
                 },
-                "config_profile_contact": {
+                "pon": {
                     "type": "string",
-                    "description": "Institutional config contact information.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to Panel of Normals HDF5 file for read count denoising.",
+                    "fa_icon": "fas fa-database",
+                    "help_text": "Created with GATK CreateReadCountPanelOfNormals. Must use the same reference and intervals."
                 },
-                "config_profile_url": {
+                "common_snps": {
                     "type": "string",
-                    "description": "Institutional config URL link.",
-                    "hidden": true,
-                    "fa_icon": "fas fa-users-cog"
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to common SNPs VCF file (.vcf.gz) for allelic count collection.",
+                    "fa_icon": "fas fa-file-alt",
+                    "help_text": "A tabix-indexed (.tbi) VCF of common germline SNPs. The .tbi index must exist alongside the file."
+                }
+            }
+        },
+        "annotation_options": {
+            "title": "Annotation options",
+            "type": "object",
+            "fa_icon": "fas fa-tags",
+            "description": "Options for gene annotation of CNV segments.",
+            "properties": {
+                "mane_annotation": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to MANE Select exon annotation file (tab-delimited with columns: chr, start, end, gene_symbol, exon, transcript_id).",
+                    "fa_icon": "fas fa-map-marker-alt"
+                },
+                "genes_list": {
+                    "type": "string",
+                    "format": "file-path",
+                    "default": "${projectDir}/assets/cancer_genes.txt",
+                    "description": "Text file with cancer gene symbols for CNV annotation (one gene per line, # for comments).",
+                    "fa_icon": "fas fa-dna",
+                    "help_text": "A default list of ~107 cancer-relevant genes (tumor suppressors and oncogenes) is provided in assets/cancer_genes.txt. Users can supply their own custom gene list to filter CNV annotation results."
+                }
+            }
+        },
+        "pipeline_options": {
+            "title": "Pipeline options",
+            "type": "object",
+            "fa_icon": "fas fa-cogs",
+            "description": "Options to skip pipeline steps.",
+            "properties": {
+                "skip_plots": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip generation of diagnostic plots (PlotDenoisedCopyRatios and PlotModeledSegments).",
+                    "fa_icon": "fas fa-chart-bar"
+                },
+                "skip_annotation": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip gene annotation of CNV segments.",
+                    "fa_icon": "fas fa-tags"
+                }
+            }
+        },
+        "max_job_request_options": {
+            "title": "Max job request options",
+            "type": "object",
+            "fa_icon": "fab fa-acquisitions-incorporated",
+            "description": "Set the top limit for requested resources for any single job.",
+            "help_text": "If you are running on a smaller system, a pipeline step requesting more resources than are available may cause the Nextflow to stop the run with an error. These options allow you to cap the maximum resources requested by any single job so that the pipeline will run on your system.\n\nNote that you can not _increase_ the resources requested by any job using these options. For that you will need your own configuration file. See [the nf-core website](https://nf-co.re/usage/configuration) for details.",
+            "properties": {
+                "max_cpus": {
+                    "type": "integer",
+                    "description": "Maximum number of CPUs that can be requested for any single job.",
+                    "default": 16,
+                    "fa_icon": "fas fa-microchip",
+                    "hidden": true
+                },
+                "max_memory": {
+                    "type": "string",
+                    "description": "Maximum amount of memory that can be requested for any single job.",
+                    "default": "128.GB",
+                    "fa_icon": "fas fa-memory",
+                    "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
+                    "hidden": true
+                },
+                "max_time": {
+                    "type": "string",
+                    "description": "Maximum amount of time that can be requested for any single job.",
+                    "default": "240.h",
+                    "fa_icon": "far fa-clock",
+                    "pattern": "^(\\d+\\.?\\s*(s|m|h|d|day)\\s*)+$",
+                    "hidden": true
                 }
             }
         },
@@ -83,13 +165,31 @@
             "title": "Generic options",
             "type": "object",
             "fa_icon": "fas fa-file-import",
-            "description": "Less common options for the pipeline, typically set in a config file.",
+            "description": "Less common options for the pipeline, typically set in a config profile.",
             "help_text": "These options are common to all nf-core pipelines and allow you to customise some of the core preferences for how the pipeline runs.\n\nTypically these options would be set in a Nextflow config file loaded for all pipeline runs, such as `~/.nextflow/config`.",
             "properties": {
+                "help": {
+                    "type": "boolean",
+                    "description": "Display help text.",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "help_full": {
+                    "type": "boolean",
+                    "description": "Display full help text including hidden parameters.",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "show_hidden": {
+                    "type": "boolean",
+                    "description": "Show hidden parameters in help text.",
+                    "fa_icon": "fas fa-eye",
+                    "hidden": true
+                },
                 "version": {
                     "type": "boolean",
                     "description": "Display version and exit.",
-                    "fa_icon": "fas fa-question-circle",
+                    "fa_icon": "fas fa-code-branch",
                     "hidden": true
                 },
                 "publish_dir_mode": {
@@ -109,48 +209,25 @@
                 },
                 "validate_params": {
                     "type": "boolean",
-                    "description": "Boolean whether to validate parameters against the schema at runtime",
+                    "description": "Boolean whether to validate parameters against the schema at runtime.",
                     "default": true,
                     "fa_icon": "fas fa-check-square",
                     "hidden": true
                 },
-                "pipelines_testdata_base_path": {
-                    "type": "string",
-                    "fa_icon": "far fa-check-circle",
-                    "description": "Base URL or local path to location of pipeline test dataset files",
-                    "default": "https://raw.githubusercontent.com/nf-core/test-datasets/",
-                    "hidden": true
-                },
                 "trace_report_suffix": {
                     "type": "string",
-                    "fa_icon": "far calendar",
-                    "description": "Suffix to add to the trace report filename. Default is the date and time in the format yyyy-MM-dd_HH-mm-ss.",
+                    "description": "Suffix for trace report filenames.",
                     "hidden": true
-                },
-                "help": {
-                    "type": ["boolean", "string"],
-                    "description": "Display the help message."
-                },
-                "help_full": {
-                    "type": "boolean",
-                    "description": "Display the full detailed help message."
-                },
-                "show_hidden": {
-                    "type": "boolean",
-                    "description": "Display hidden parameters in the help message (only works when --help or --help_full are provided)."
                 }
             }
         }
     },
     "allOf": [
-        {
-            "$ref": "#/$defs/input_output_options"
-        },
-        {
-            "$ref": "#/$defs/institutional_config_options"
-        },
-        {
-            "$ref": "#/$defs/generic_options"
-        }
+        { "$ref": "#/$defs/input_output_options" },
+        { "$ref": "#/$defs/reference_genome_options" },
+        { "$ref": "#/$defs/annotation_options" },
+        { "$ref": "#/$defs/pipeline_options" },
+        { "$ref": "#/$defs/max_job_request_options" },
+        { "$ref": "#/$defs/generic_options" }
     ]
 }
