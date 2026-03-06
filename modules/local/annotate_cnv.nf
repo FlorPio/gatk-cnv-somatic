@@ -2,17 +2,18 @@ process ANNOTATE_CNV {
     tag "${meta.id}"
     label 'process_single'
 
+    conda "conda-forge::r-base=4.3 conda-forge::r-optparse conda-forge::r-dplyr conda-forge::r-tidyr bioconda::bioconductor-genomicranges"
     container "docker.io/florpio/cnv-annotate-r:1.0"
 
     input:
     tuple val(meta), path(model_segments)
     path(mane_annotation)
-    path(rscript)
+    path(genes_list)
 
     output:
-    tuple val(meta), path("*.txt"),     emit: annotated
-    tuple val(meta), path("*.txt"),       emit: summary, optional: true
-    path "versions.yml",                          emit: versions
+    tuple val(meta), path("*_annotated.txt"), emit: annotated
+    tuple val(meta), path("*_purity.txt"),    emit: purity, optional: true
+    path "versions.yml",                      emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -21,18 +22,20 @@ process ANNOTATE_CNV {
     def args   = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    Rscript ${rscript} \\
+    annotate_cnvs.R \\
         --input_dir . \\
         --mane ${mane_annotation} \\
+        --genes_list ${genes_list} \\
         --output_dir . \\
         ${args}
 
-    # Rename output to include sample prefix
-    for f in *.txt; do
-        if [ -f "\$f" ] && [[ "\$f" != "${prefix}"* ]]; then
-            mv "\$f" "${prefix}_annotated.tsv" 2>/dev/null || true
-        fi
-    done
+    # Rename outputs to include sample prefix
+    if [ -f "CNVs_annotated_all_samples.txt" ]; then
+        mv CNVs_annotated_all_samples.txt ${prefix}_annotated.txt
+    fi
+    if [ -f "tumor_purity_estimates.txt" ]; then
+        mv tumor_purity_estimates.txt ${prefix}_purity.txt
+    fi
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -43,7 +46,7 @@ process ANNOTATE_CNV {
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_annotated.tsv
+    touch ${prefix}_annotated.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -51,3 +54,4 @@ process ANNOTATE_CNV {
     END_VERSIONS
     """
 }
+
