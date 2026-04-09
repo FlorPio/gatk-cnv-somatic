@@ -37,8 +37,12 @@ workflow GATK_CNV_SOMATIC {
 
     // =========================================
     // Prepare reference channels
+    // NOTE: FASTA must be main chromosomes only
+    //       (hg38 without alt/decoy/HLA contigs)
+    //       to match the Panel of Normals and
+    //       preprocessed interval list.
     // =========================================
-    
+
     ch_fasta       = Channel.value([ [:], file(params.fasta) ])
     ch_fai         = Channel.value([ [:], file(params.fai) ])
     ch_dict        = Channel.value([ [:], file(params.dict) ])
@@ -48,28 +52,45 @@ workflow GATK_CNV_SOMATIC {
     ch_common_snps_tbi = file(params.common_snps + ".tbi")
 
     // =========================================
-    // Prepare BAM channels (tumor + normal combined)
+    // Prepare BAM channels
+    //
+    // Tumor BAMs → CollectReadCounts + DenoiseReadCounts + CollectAllelicCounts
+    // Normal BAMs → CollectAllelicCounts only
+    //
+    // Normal QC (denoising, segmentation) is handled
+    // by the gatk-cnv-pon pipeline, not here.
     // =========================================
-    
-    ch_all_bams = ch_samplesheet
-        .flatMap { meta, tumor_bam, tumor_bai, normal_bam, normal_bai ->
-            def tumor_meta  = meta + [sample_type: 'tumor',  id: "${meta.id}_tumor", patient_id: meta.id]
-            def normal_meta = meta + [sample_type: 'normal', id: "${meta.id}_normal", patient_id: meta.id]
-            [
-                [ tumor_meta,  tumor_bam,  tumor_bai ],
-                [ normal_meta, normal_bam, normal_bai ]
+
+    ch_tumor_bams = ch_samplesheet
+        .map { meta, tumor_bam, tumor_bai, normal_bam, normal_bai ->
+            def tumor_meta = meta + [
+                sample_type: 'tumor',
+                id:          "${meta.id}_tumor",
+                patient_id:  meta.id,
+                tumor_name:  "${meta.id}_tumor"
             ]
+            [ tumor_meta, tumor_bam, tumor_bai ]
         }
 
-    ch_bams_with_intervals = ch_all_bams
-        .map { meta, bam, bai -> [ meta, bam, bai, ch_intervals ] }
+    ch_normal_bams = ch_samplesheet
+        .map { meta, tumor_bam, tumor_bai, normal_bam, normal_bai ->
+            def normal_meta = meta + [
+                sample_type: 'normal',
+                id:          "${meta.id}_normal",
+                patient_id:  meta.id
+            ]
+            [ normal_meta, normal_bam, normal_bai ]
+        }
 
     // =========================================
-    // 1. COLLECT READ COUNTS (tumor + normal)
+    // 1. COLLECT READ COUNTS (tumor only)
     // =========================================
-    
+
+    ch_tumor_with_intervals = ch_tumor_bams
+        .map { meta, bam, bai -> [ meta, bam, bai, ch_intervals ] }
+
     GATK4_COLLECTREADCOUNTS(
-        ch_bams_with_intervals,
+        ch_tumor_with_intervals,
         ch_fasta,
         ch_fai,
         ch_dict
@@ -77,9 +98,9 @@ workflow GATK_CNV_SOMATIC {
     ch_versions = ch_versions.mix(GATK4_COLLECTREADCOUNTS.out.versions.first())
 
     // =========================================
-    // 2. DENOISE READ COUNTS (tumor + normal)
+    // 2. DENOISE READ COUNTS (tumor only)
     // =========================================
-    
+
     GATK4_DENOISEREADCOUNTS(
         GATK4_COLLECTREADCOUNTS.out.hdf5,
         ch_pon
@@ -88,8 +109,13 @@ workflow GATK_CNV_SOMATIC {
 
     // =========================================
     // 3. COLLECT ALLELIC COUNTS (tumor + normal)
+    //    Both are needed for ModelSegments:
+    //      tumor allelic  → --allelic-counts
+    //      normal allelic → --normal-allelic-counts
     // =========================================
-    
+
+    ch_all_bams = ch_tumor_bams.mix(ch_normal_bams)
+
     COLLECTALLELICCOUNTS(
         ch_all_bams,
         ch_fasta,
@@ -102,27 +128,33 @@ workflow GATK_CNV_SOMATIC {
 
     // =========================================
     // 4. MODEL SEGMENTS (tumor with matched normal)
+    //
+    // Join strategy:
+    //   - Tumor files joined by meta.id (unique per tumor,
+    //     supports multiple tumors per patient)
+    //   - Normal paired via combine(by: 0) on patient_id
+    //     (1 normal broadcast to N tumors)
     // =========================================
-    
-    ch_tumor_denoised = GATK4_DENOISEREADCOUNTS.out.denoised
-        .filter { meta, file -> meta.sample_type == 'tumor' }
-        .map { meta, file -> [ meta.patient_id, meta, file ] }
 
-    ch_tumor_standardized = GATK4_DENOISEREADCOUNTS.out.standardized
-        .filter { meta, file -> meta.sample_type == 'tumor' }
-        .map { meta, file -> [ meta.patient_id, file ] }
+    ch_tumor_denoised = GATK4_DENOISEREADCOUNTS.out.denoised
+        .map { meta, file -> [ meta.id, meta, file ] }
 
     ch_tumor_allelic = COLLECTALLELICCOUNTS.out.allelic_counts
         .filter { meta, file -> meta.sample_type == 'tumor' }
-        .map { meta, file -> [ meta.patient_id, file ] }
+        .map { meta, file -> [ meta.id, file ] }
 
     ch_normal_allelic = COLLECTALLELICCOUNTS.out.allelic_counts
         .filter { meta, file -> meta.sample_type == 'normal' }
         .map { meta, file -> [ meta.patient_id, file ] }
 
+    // Step 1: join tumor denoised + tumor allelic by meta.id (1:1)
+    // Step 2: re-key by patient_id, combine with normal (1:N)
     ch_model_segments_input = ch_tumor_denoised
         .join(ch_tumor_allelic)
-        .join(ch_normal_allelic)
+        .map { tumor_id, meta, denoised, tumor_allelic ->
+            [ meta.patient_id, meta, denoised, tumor_allelic ]
+        }
+        .combine(ch_normal_allelic, by: 0)
         .map { patient_id, meta, denoised, tumor_allelic, normal_allelic ->
             [ meta, denoised, tumor_allelic, normal_allelic ]
         }
@@ -135,7 +167,7 @@ workflow GATK_CNV_SOMATIC {
     // =========================================
     // 5. CALL COPY RATIO SEGMENTS
     // =========================================
-    
+
     CALLCOPYRATIOSEGMENTS(
         MODELSEGMENTS_SOMATIC.out.cr_segments
     )
@@ -143,13 +175,19 @@ workflow GATK_CNV_SOMATIC {
 
     // =========================================
     // 6. PLOTS (optional)
+    //    --minimum-contig-length is passed via
+    //    ext.args in conf/modules.config using
+    //    params.somatic_min_contig_length
     // =========================================
-    
+
     if (!params.skip_plots) {
-        
+
+        ch_tumor_standardized = GATK4_DENOISEREADCOUNTS.out.standardized
+            .map { meta, file -> [ meta.id, file ] }
+
         ch_plot_denoised_input = ch_tumor_denoised
             .join(ch_tumor_standardized)
-            .map { patient_id, meta, denoised, standardized ->
+            .map { tumor_id, meta, denoised, standardized ->
                 [ meta, standardized, denoised ]
             }
 
@@ -159,18 +197,16 @@ workflow GATK_CNV_SOMATIC {
         )
         ch_versions = ch_versions.mix(PLOTDENOISEDCOPYRATIOS.out.versions.first())
 
-        ch_plot_modeled_input = GATK4_DENOISEREADCOUNTS.out.denoised
-            .filter { meta, file -> meta.sample_type == 'tumor' }
-            .map { meta, file -> [ meta.patient_id, meta, file ] }
+        ch_plot_modeled_input = ch_tumor_denoised
             .join(
                 MODELSEGMENTS_SOMATIC.out.hets
-                    .map { meta, file -> [ meta.patient_id, file ] }
+                    .map { meta, file -> [ meta.id, file ] }
             )
             .join(
                 MODELSEGMENTS_SOMATIC.out.segments
-                    .map { meta, file -> [ meta.patient_id, file ] }
+                    .map { meta, file -> [ meta.id, file ] }
             )
-            .map { patient_id, meta, denoised, hets, segments ->
+            .map { tumor_id, meta, denoised, hets, segments ->
                 [ meta, denoised, hets, segments ]
             }
 
@@ -183,10 +219,12 @@ workflow GATK_CNV_SOMATIC {
 
     // =========================================
     // 7. ANNOTATE CNVs (optional)
+    //    R script is in bin/ (auto-available in $PATH)
+    //    Has fallback: creates empty output if R fails
     // =========================================
-    
+
     if (!params.skip_annotation) {
-        
+
         ch_annotate_input = MODELSEGMENTS_SOMATIC.out.segments
             .join(MODELSEGMENTS_SOMATIC.out.cr_segments, by: 0)
             .map { meta, segments, cr_seg ->

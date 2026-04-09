@@ -3,42 +3,44 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - 2026-02-23
+## [1.2.0] - 2026-04-09
 
 ### Breaking Changes
 
-- **Removed `params.annotate_script`** — The R annotation script is no longer passed as a pipeline parameter. It now lives in `bin/annotate_cnvs.R` following nf-core conventions, and is automatically available in the process `$PATH`. Users who referenced `annotate_script` in their `params.json` must remove it.
+- **Removed `params.annotate_script`** — The R annotation script now lives in `bin/annotate_cnvs.R` following nf-core conventions and is automatically available in the process `$PATH`. Users who referenced `annotate_script` in their `params.json` must remove it.
+- **CollectReadCounts and DenoiseReadCounts now run on tumor samples only.** Normal BAMs are only used for CollectAllelicCounts (required by ModelSegments). Normal QC (denoising, segmentation) belongs to the companion pipeline `gatk-cnv-pon`.
 
 ### Added
 
-- **External gene list file** (`assets/cancer_genes.txt`) — The list of ~107 cancer-relevant genes (tumor suppressors and oncogenes) previously hardcoded in the R script is now an external text file. Users can supply their own custom gene list via `--genes_list` to filter CNV annotation results without modifying pipeline code.
-- **`--genes_list` parameter** — New pipeline parameter pointing to the gene list file. Defaults to `${projectDir}/assets/cancer_genes.txt`.
-- **`conf/modules.config`** — Centralized `publishDir` configuration for all modules and GATK container version overrides, following nf-core standards.
-- **`conda` directive in `ANNOTATE_CNV`** — Module now declares its conda dependencies (`r-base`, `r-optparse`, `r-dplyr`, `r-tidyr`, `bioconductor-genomicranges`), enabling execution without Docker.
-- **Execution reports** — `timeline`, `report`, `trace`, and `dag` are now enabled by default in `nextflow.config`.
-- **`params.publish_dir_mode`** — Configurable publish directory mode (default: `copy`).
+- **External gene list** (`assets/cancer_genes.txt`) — ~107 cancer genes previously hardcoded in the R script. Users can supply their own list via `--genes_list`.
+- **`--genes_list` parameter** — Points to the gene list file. Defaults to `${projectDir}/assets/cancer_genes.txt`.
+- **`--somatic_min_contig_length` parameter** — Configurable minimum contig length for PlotDenoisedCopyRatios and PlotModeledSegments (default: 46709983, chr22 in hg38).
+- **`conf/modules.config`** — Centralized `publishDir` configuration and GATK 4.6.2.0 container overrides.
+- **`conda` directive in `ANNOTATE_CNV`** — Enables execution without Docker.
+- **Annotation fallback** — If the R script fails, an empty output with correct headers is created and the pipeline continues.
+- **`tumor_name` field in meta map** — Supports multiple tumors per patient.
+- **Execution reports** — timeline, report, trace, and dag enabled by default.
 
 ### Changed
 
-- **R annotation script moved to `bin/`** — `annotate_cnvs_complete_fixed.R` renamed to `bin/annotate_cnvs.R`. Nextflow automatically adds `bin/` to `$PATH` in all processes, eliminating the need to pass the script as an input file.
-- **R script accepts `--genes_list` parameter** — Replaces the hardcoded `genes_list <- c(...)` block (previously lines 78-94). The script now reads gene symbols from an external file, one per line, with `#` comment support.
-- **R script comments translated to English** — All Spanish comments and log messages converted to English for international visibility and consistency.
-- **GATK version standardized to 4.6.2.0** — All local modules (`MODELSEGMENTS_SOMATIC`, `CALLCOPYRATIOSEGMENTS`, `COLLECTALLELICCOUNTS`, `PLOTDENOISEDCOPYRATIOS`, `PLOTMODELEDSEGMENTS`) updated from `gatk:4.4.0.0` to `gatk:4.6.2.0` via `conf/modules.config` container overrides. Version 4.6.2.0 was validated to produce improved segmentation accuracy.
-- **`ANNOTATE_CNV` module refactored**:
-  - Input `path(rscript)` replaced with `path(genes_list)`.
-  - Fixed duplicate output channels: `annotated` and `summary` previously both emitted `*.txt`. Now `annotated` emits `*_annotated.txt` and `purity` emits `*_purity.txt`.
-  - Output file renaming logic improved to handle R script outputs correctly.
-- **`nextflow_schema.json` updated** — Added `annotation_options` group with `genes_list` parameter definition. Removed `annotate_script`. Added `help_text` descriptions for reference file parameters.
-- **`params.template.json` updated** — Replaced `annotate_script` with `genes_list`.
+- **R script moved to `bin/`** — `annotate_cnvs_complete_fixed.R` → `bin/annotate_cnvs.R`. No longer passed as process input.
+- **R script accepts `--genes_list`** — Reads gene symbols from external file instead of hardcoded list.
+- **R script comments in English** — Translated for international visibility.
+- **GATK version standardized to 4.6.2.0** — All local modules overridden via `conf/modules.config`.
+- **Tumor-only processing in steps 1-2** — CollectReadCounts and DenoiseReadCounts no longer process normal samples. Normal denoised/segmented results were computed but discarded; this wasted ~40% of compute time for those steps.
+- **Robust double-key joins** — Tumor files joined by `meta.id` (unique per tumor), normal paired via `combine(by: 0)` on `patient_id`. Supports multiple tumors per patient.
+- **FASTA documented as "main chroms only"** — Prominent comments in workflow, config, and schema.
+- **Plot modules receive `--minimum-contig-length`** via `ext.args` in `conf/modules.config`.
 
 ### Fixed
 
-- **Duplicate output channels in `ANNOTATE_CNV`** — The `annotated` and `summary` emit channels both matched `*.txt`, causing Nextflow to emit the same files on both channels. Now each channel has a distinct glob pattern.
+- **Duplicate output channels in `ANNOTATE_CNV`** — `annotated` and `summary` both matched `*.txt`. Now each has a distinct pattern.
 
 ### Removed
 
-- **`params.annotate_script`** — No longer needed; the R script is bundled in `bin/`.
-- **Hardcoded gene list in R script** — Replaced by external `assets/cancer_genes.txt`.
+- **`params.annotate_script`** — R script bundled in `bin/`.
+- **Hardcoded gene list** — Replaced by `assets/cancer_genes.txt`.
+- **Normal processing in CollectReadCounts/DenoiseReadCounts** — Moved to `gatk-cnv-pon` pipeline.
 
 ---
 
@@ -48,9 +50,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of the GATK CNV Somatic pipeline.
 - Nextflow DSL2 implementation based on nf-core template.
-- Support for tumor-normal paired CNV analysis using GATK4 best practices.
-- Steps: CollectReadCounts, DenoiseReadCounts, CollectAllelicCounts, ModelSegments, CallCopyRatioSegments.
-- Optional diagnostic plots (PlotDenoisedCopyRatios, PlotModeledSegments).
-- Optional gene annotation with MANE Select transcripts and purity-corrected absolute copy number.
-- Docker images for references (`florpio/cnv-references:hg38-v1.0`) and R annotation (`florpio/cnv-annotate-r:1.0`).
-- Template configuration files and example samplesheet.
+- Tumor-normal paired CNV analysis using GATK4 best practices.
+- Docker images: `florpio/cnv-references:hg38-v1.0`, `florpio/cnv-annotate-r:1.0`.
