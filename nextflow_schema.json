@@ -42,9 +42,9 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "description": "Path to FASTA genome reference file (hg38 main chromosomes).",
+                    "description": "Path to FASTA genome reference file (hg38 main chromosomes only).",
                     "fa_icon": "fas fa-font",
-                    "help_text": "Must be the same reference used to create the Panel of Normals."
+                    "help_text": "IMPORTANT: Must contain main chromosomes only (chr1-chr22, chrX, chrY) without alt contigs, decoys, HLA, or unplaced scaffolds. This is required for compatibility with the Panel of Normals and preprocessed interval list. The reference florpio/cnv-references:hg38-v1.0 provides a pre-filtered hg38.main_chroms.fa."
                 },
                 "fai": {
                     "type": "string",
@@ -126,6 +126,13 @@
                     "default": false,
                     "description": "Skip gene annotation of CNV segments.",
                     "fa_icon": "fas fa-tags"
+                },
+                "somatic_min_contig_length": {
+                    "type": "integer",
+                    "default": 46709983,
+                    "description": "Minimum contig length for diagnostic plots (PlotDenoisedCopyRatios and PlotModeledSegments).",
+                    "fa_icon": "fas fa-ruler",
+                    "help_text": "Contigs shorter than this value are excluded from plots. The default value of 46709983 corresponds to the length of chr22 in hg38, effectively excluding chrM and any small contigs. Passed to GATK as --minimum-contig-length. Adjust if using a different reference genome."
                 }
             }
         },
