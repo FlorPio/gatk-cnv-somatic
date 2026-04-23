@@ -1,0 +1,14 @@
+{
+    "input": "samplesheet.csv",
+    "outdir": "results",
+    "fasta": "/path/to/references/genome/hg38.main_chroms.fa",
+    "fai": "/path/to/references/genome/hg38.main_chroms.fa.fai",
+    "dict": "/path/to/references/genome/hg38.main_chroms.dict",
+    "intervals": "/path/to/references/intervals/preprocessed.interval_list",
+    "pon": "/path/to/references/pon/wes-do-gc.pon.hdf5",
+    "common_snps": "/path/to/references/snps/common_snps_preprocessed.vcf.gz",
+    "mane_annotation": "/path/to/references/annotation/exons_mane.txt",
+    "genes_list": "assets/cancer_genes.txt",
+    "skip_plots": false,
+    "skip_annotation": false
+}
