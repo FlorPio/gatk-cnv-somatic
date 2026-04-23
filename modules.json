@@ -1,19 +1,27 @@
 {
-    "name": "FlorPio/gatk-cnv-somatic",
-    "homePage": "https://github.com/FlorPio/gatk-cnv-somatic",
-    "repos": {
-        "https://github.com/nf-core/modules.git": {
-            "modules": {
-                "nf-core": {
-                    "gatk4/preprocessintervals": {
-                        "branch": "master",
-                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
-                        "installed_by": [
-                            "modules"
-                        ]
-                    }
-                }
-            }
+  "name": "FlorPio/gatk-cnv-somatic",
+  "homePage": "https://github.com/FlorPio/gatk-cnv-somatic",
+  "repos": {
+    "https://github.com/nf-core/modules.git": {
+      "modules": {
+        "nf-core": {
+          "gatk4/collectreadcounts": {
+            "branch": "master",
+            "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+            "installed_by": ["modules"]
+          },
+          "gatk4/denoisereadcounts": {
+            "branch": "master",
+            "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+            "installed_by": ["modules"]
+          },
+          "gatk4/preprocessintervals": {
+            "branch": "master",
+            "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
+            "installed_by": ["modules"]
+          }
         }
+      }
     }
+  }
 }
