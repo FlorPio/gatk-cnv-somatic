@@ -20,10 +20,8 @@ This pipeline performs CNV calling on tumor-normal matched pairs using the GATK4
 
 ## Pipeline Steps
 
-```
 ![Pipeline Diagram](docs/images/pipeline_diagram.png)
 
-```
 
 > **Note:** Steps 1-2 run on tumor samples only. Normal BAMs are used only for CollectAllelicCounts (step 3).
 > Normal QC (denoising, segmentation) is handled by the companion pipeline [gatk-cnv-pon](https://github.com/FlorPio/gatk-cnv-pon).
