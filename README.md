@@ -21,56 +21,8 @@ This pipeline performs CNV calling on tumor-normal matched pairs using the GATK4
 ## Pipeline Steps
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        GATK CNV Somatic Pipeline                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Tumor BAM ──┐    Normal BAM ──┐    References:                        │
-│              │                 │    • Panel of Normals (.hdf5)          │
-│              │                 │    • Common SNPs (.vcf.gz)             │
-│              │                 │    • Intervals (.bed or .interval_list)│
-│              │                 │    • FASTA (main chroms only)          │
-│              ▼                 │                                        │
-│  ┌──────────────────────────┐  │                                        │
-│  │ 0. PreprocessIntervals   │  │  ◄── only if .bed provided            │
-│  │    (auto-detected)       │  │      skipped for .interval_list        │
-│  └────────────┬─────────────┘  │                                        │
-│               ▼                │                                        │
-│  ┌──────────────────────────┐  │                                        │
-│  │ 1. CollectReadCounts     │  │  ◄── tumor only                       │
-│  └────────────┬─────────────┘  │                                        │
-│               ▼                │                                        │
-│  ┌──────────────────────────┐  │                                        │
-│  │ 2. DenoiseReadCounts     │  │  ◄── tumor only, uses PON             │
-│  └────────────┬─────────────┘  │                                        │
-│               │                │                                        │
-│               ▼                ▼                                        │
-│  ┌─────────────────┐ ┌─────────────────┐                               │
-│  │ 3. Collect      │ │ 3. Collect      │                               │
-│  │ AllelicCounts   │ │ AllelicCounts   │ ◄── Common SNPs + FASTA       │
-│  │ (Tumor)         │ │ (Normal)        │                               │
-│  └────────┬────────┘ └────────┬────────┘                               │
-│           │                   │                                        │
-│           └─────────┬─────────┘                                        │
-│                     ▼                                                   │
-│  ┌──────────────────────────────────────┐                              │
-│  │ 4. ModelSegments                      │                              │
-│  │    Inputs: DenoisedCR(T) +            │                              │
-│  │    AllelicCounts(T) + AllelicCounts(N)│                              │
-│  │    Outputs: .modelFinal.seg           │                              │
-│  │             .cr.seg                   │                              │
-│  │             .hets.tsv                 │                              │
-│  └──────────────────┬───────────────────┘                              │
-│                     │                                                   │
-│         ┌───────────┼──────────────┐                                   │
-│         ▼           ▼              ▼                                   │
-│  ┌───────────┐ ┌──────────┐ ┌──────────────┐                          │
-│  │ 5. Call   │ │ 6. Plot  │ │ 7. Annotate  │                          │
-│  │ CNVs      │ │ Results  │ │ Genes        │                          │
-│  │ (.cr.seg) │ │ (+DICT)  │ │ (MANE+Genes) │                          │
-│  └───────────┘ └──────────┘ └──────────────┘                          │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
+![Pipeline Diagram](docs/images/pipeline_diagram.png)
+
 ```
 
 > **Note:** Steps 1-2 run on tumor samples only. Normal BAMs are used only for CollectAllelicCounts (step 3).
