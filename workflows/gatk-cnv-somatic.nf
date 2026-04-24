@@ -5,8 +5,9 @@
 */
 
 // nf-core modules
-include { GATK4_COLLECTREADCOUNTS } from '../modules/nf-core/gatk4/collectreadcounts/main'
-include { GATK4_DENOISEREADCOUNTS } from '../modules/nf-core/gatk4/denoisereadcounts/main'
+include { GATK4_PREPROCESSINTERVALS } from '../modules/nf-core/gatk4/preprocessintervals/main'
+include { GATK4_COLLECTREADCOUNTS   } from '../modules/nf-core/gatk4/collectreadcounts/main'
+include { GATK4_DENOISEREADCOUNTS   } from '../modules/nf-core/gatk4/denoisereadcounts/main'
 
 // Local modules
 include { COLLECTALLELICCOUNTS    } from '../modules/local/collectalleliccounts'
@@ -47,9 +48,52 @@ workflow GATK_CNV_SOMATIC {
     ch_fai         = Channel.value([ [:], file(params.fai) ])
     ch_dict        = Channel.value([ [:], file(params.dict) ])
     ch_pon         = Channel.value([ [:], file(params.pon) ])
-    ch_intervals   = file(params.intervals)
     ch_common_snps = file(params.common_snps)
     ch_common_snps_tbi = file(params.common_snps + ".tbi")
+
+    // =========================================
+    // 0. PREPARE INTERVALS
+    //
+    // Auto-detect input type:
+    //   .interval_list → use directly (skip preprocessing)
+    //   .bed           → run PreprocessIntervals
+    //
+    // IMPORTANT: The interval list must match the one
+    // used to create the Panel of Normals. If you provide
+    // a .bed file, ensure the same .bed + padding + bin_length
+    // were used for PON creation.
+    // =========================================
+
+    def intervals_file = file(params.intervals)
+
+    if (intervals_file.name.endsWith('.interval_list')) {
+
+        log.info "Intervals: using pre-computed interval list (skipping PreprocessIntervals)"
+        ch_intervals = intervals_file
+
+    } else {
+
+        log.info "Intervals: running PreprocessIntervals on ${intervals_file.name}"
+
+        ch_intervals_input = params.intervals
+            ? Channel.value([ [:], file(params.intervals) ])
+            : Channel.value([ [:], [] ])
+        ch_exclude_intervals = params.exclude_intervals
+            ? Channel.value([ [:], file(params.exclude_intervals) ])
+            : Channel.value([ [:], [] ])
+
+        GATK4_PREPROCESSINTERVALS(
+            ch_fasta,
+            ch_fai,
+            ch_dict,
+            ch_intervals_input,
+            ch_exclude_intervals
+        )
+        ch_versions = ch_versions.mix(GATK4_PREPROCESSINTERVALS.out.versions)
+
+        ch_intervals = GATK4_PREPROCESSINTERVALS.out.interval_list
+            .map { meta, interval_list -> interval_list }
+    }
 
     // =========================================
     // Prepare BAM channels

@@ -64,9 +64,27 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "description": "Path to preprocessed interval list for target regions.",
+                    "description": "Path to target intervals (.bed or .interval_list). Auto-detected: .bed triggers PreprocessIntervals, .interval_list is used directly.",
                     "fa_icon": "fas fa-list",
-                    "help_text": "Picard or GATK-style interval list. For WES, these are the exome capture targets."
+                    "help_text": "For WES: provide the capture target BED or a pre-computed interval list. If a .bed file is provided, PreprocessIntervals will run automatically with the configured padding and bin_length. If a .interval_list is provided, it is used as-is (must match the PON). For WGS: leave null and the genome will be binned."
+                },
+                "exclude_intervals": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to blacklist regions to exclude (optional). Only used when --intervals is a .bed file.",
+                    "fa_icon": "fas fa-ban"
+                },
+                "bin_length": {
+                    "type": "integer",
+                    "default": 0,
+                    "description": "Bin length for PreprocessIntervals. 0 = no binning (WES), 1000 = 1kb bins (WGS). Only used when --intervals is a .bed file.",
+                    "fa_icon": "fas fa-ruler-horizontal"
+                },
+                "padding": {
+                    "type": "integer",
+                    "default": 250,
+                    "description": "Padding in bp to add to both sides of each interval. Only used when --intervals is a .bed file.",
+                    "fa_icon": "fas fa-arrows-alt-h"
                 },
                 "pon": {
                     "type": "string",
