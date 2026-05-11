@@ -18,16 +18,37 @@
                 "format": "file-path",
                 "exists": true,
                 "pattern": "^\\S+\\.bam$",
-                "errorMessage": "Tumor BAM file must be provided and have extension '.bam'"
+                "errorMessage": "Tumor BAM file, when provided, must have extension '.bam'"
             },
             "normal_bam": {
                 "type": "string",
                 "format": "file-path",
                 "exists": true,
                 "pattern": "^\\S+\\.bam$",
-                "errorMessage": "Normal BAM file must be provided and have extension '.bam'"
+                "errorMessage": "Normal BAM file, when provided, must have extension '.bam'"
+            },
+            "tumor_counts": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.(hdf5|tsv)$",
+                "errorMessage": "Tumor read counts file, when provided, must have extension '.hdf5' or '.tsv' (output of GATK CollectReadCounts)"
+            },
+            "tumor_allelic": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.tsv$",
+                "errorMessage": "Tumor allelic counts file, when provided, must have extension '.tsv' (output of GATK CollectAllelicCounts)"
+            },
+            "normal_allelic": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+\\.tsv$",
+                "errorMessage": "Normal allelic counts file, when provided, must have extension '.tsv' (output of GATK CollectAllelicCounts)"
             }
         },
-        "required": ["sample", "tumor_bam", "normal_bam"]
+        "required": ["sample"]
     }
 }

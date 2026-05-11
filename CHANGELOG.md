@@ -3,6 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Precomputed input columns in samplesheet** — `tumor_counts` (`.hdf5`), `tumor_allelic` (`.tsv`), and `normal_allelic` (`.tsv`) can be supplied per row to skip the BAM-based steps (`CollectReadCounts`, `CollectAllelicCounts`). BAMs and precomputed files can be mixed across rows and within a row. Per-row validation guarantees each downstream step receives either a BAM or a precomputed file.
+
+### Changed
+
+- **Samplesheet schema** — `tumor_bam` and `normal_bam` are no longer unconditionally required. They are required only when the corresponding precomputed file is absent.
+
 ## [1.2.0] - 2026-04-09
 
 ### Breaking Changes
