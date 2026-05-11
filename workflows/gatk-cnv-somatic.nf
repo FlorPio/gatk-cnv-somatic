@@ -30,7 +30,10 @@ include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pi
 workflow GATK_CNV_SOMATIC {
 
     take:
-    ch_samplesheet  // channel: [ meta, tumor_bam, tumor_bai, normal_bam, normal_bai ]
+    ch_samplesheet  // channel: [ meta, tumor_bam, tumor_bai, normal_bam, normal_bai,
+                    //            tumor_counts, tumor_allelic, normal_allelic ]
+                    // Any BAM/precomputed file may be [] (sentinel for "not provided"),
+                    // validated upstream in PIPELINE_INITIALISATION.
 
     main:
 
@@ -96,72 +99,116 @@ workflow GATK_CNV_SOMATIC {
     }
 
     // =========================================
-    // Prepare BAM channels
+    // Prepare per-sample channels
     //
-    // Tumor BAMs → CollectReadCounts + DenoiseReadCounts + CollectAllelicCounts
-    // Normal BAMs → CollectAllelicCounts only
+    // For each samplesheet row we derive three "task" channels — one per
+    // process that consumes BAMs. Rows that already provide the precomputed
+    // output (tumor_counts / tumor_allelic / normal_allelic) bypass the
+    // corresponding process; rows that only have BAMs run it as before.
+    // Mixed samplesheets are supported.
     //
-    // Normal QC (denoising, segmentation) is handled
-    // by the gatk-cnv-pon pipeline, not here.
+    // Normal QC (denoising, segmentation) is handled by the gatk-cnv-pon
+    // pipeline, not here.
     // =========================================
 
-    ch_tumor_bams = ch_samplesheet
-        .map { meta, tumor_bam, tumor_bai, normal_bam, normal_bai ->
+    // Per-row tumor view: [ tumor_meta, t_bam, t_bai, t_counts, t_allelic ]
+    ch_tumor_row = ch_samplesheet
+        .map { meta, t_bam, t_bai, n_bam, n_bai, t_counts, t_allelic, n_allelic ->
             def tumor_meta = meta + [
                 sample_type: 'tumor',
                 id:          "${meta.id}_tumor",
                 patient_id:  meta.id,
                 tumor_name:  "${meta.id}_tumor"
             ]
-            [ tumor_meta, tumor_bam, tumor_bai ]
+            [ tumor_meta, t_bam, t_bai, t_counts, t_allelic ]
         }
 
-    ch_normal_bams = ch_samplesheet
-        .map { meta, tumor_bam, tumor_bai, normal_bam, normal_bai ->
+    // Per-row normal view: [ normal_meta, n_bam, n_bai, n_allelic ]
+    ch_normal_row = ch_samplesheet
+        .map { meta, t_bam, t_bai, n_bam, n_bai, t_counts, t_allelic, n_allelic ->
             def normal_meta = meta + [
                 sample_type: 'normal',
                 id:          "${meta.id}_normal",
                 patient_id:  meta.id
             ]
-            [ normal_meta, normal_bam, normal_bai ]
+            [ normal_meta, n_bam, n_bai, n_allelic ]
         }
 
     // =========================================
     // 1. COLLECT READ COUNTS (tumor only)
+    //    Skip rows where tumor_counts is already provided.
     // =========================================
 
-    ch_tumor_with_intervals = ch_tumor_bams
-        .map { meta, bam, bai -> [ meta, bam, bai, ch_intervals ] }
+    ch_tumor_row
+        .branch { meta, bam, bai, counts, allelic ->
+            precomputed: counts as boolean
+            from_bam:    !counts
+        }
+        .set { ch_tumor_counts_branch }
+
+    ch_tumor_for_collect = ch_tumor_counts_branch.from_bam
+        .map { meta, bam, bai, counts, allelic -> [ meta, bam, bai, ch_intervals ] }
 
     GATK4_COLLECTREADCOUNTS(
-        ch_tumor_with_intervals,
+        ch_tumor_for_collect,
         ch_fasta,
         ch_fai,
         ch_dict
     )
     ch_versions = ch_versions.mix(GATK4_COLLECTREADCOUNTS.out.versions.first())
 
+    // Unified tumor read counts channel: [ meta, hdf5 ]
+    ch_tumor_counts = GATK4_COLLECTREADCOUNTS.out.hdf5
+        .mix(
+            ch_tumor_counts_branch.precomputed
+                .map { meta, bam, bai, counts, allelic -> [ meta, counts ] }
+        )
+
     // =========================================
     // 2. DENOISE READ COUNTS (tumor only)
+    //    Runs for every tumor (precomputed or freshly collected).
     // =========================================
 
     GATK4_DENOISEREADCOUNTS(
-        GATK4_COLLECTREADCOUNTS.out.hdf5,
+        ch_tumor_counts,
         ch_pon
     )
     ch_versions = ch_versions.mix(GATK4_DENOISEREADCOUNTS.out.versions.first())
 
     // =========================================
     // 3. COLLECT ALLELIC COUNTS (tumor + normal)
-    //    Both are needed for ModelSegments:
+    //    Skip rows where the corresponding allelic_counts file is already
+    //    provided. Tumor and normal are branched independently so a row can
+    //    have e.g. tumor_allelic precomputed but normal_bam fresh.
+    //
+    //    Both outputs are needed by ModelSegments:
     //      tumor allelic  → --allelic-counts
     //      normal allelic → --normal-allelic-counts
     // =========================================
 
-    ch_all_bams = ch_tumor_bams.mix(ch_normal_bams)
+    ch_tumor_row
+        .branch { meta, bam, bai, counts, allelic ->
+            precomputed: allelic as boolean
+            from_bam:    !allelic
+        }
+        .set { ch_tumor_allelic_branch }
+
+    ch_normal_row
+        .branch { meta, bam, bai, allelic ->
+            precomputed: allelic as boolean
+            from_bam:    !allelic
+        }
+        .set { ch_normal_allelic_branch }
+
+    ch_bams_for_allelic = ch_tumor_allelic_branch.from_bam
+        .map { meta, bam, bai, counts, allelic -> [ meta, bam, bai ] }
+        .mix(
+            ch_normal_allelic_branch.from_bam
+                .map { meta, bam, bai, allelic -> [ meta, bam, bai ] }
+        )
 
     COLLECTALLELICCOUNTS(
-        ch_all_bams,
+        ch_bams_for_allelic,
         ch_fasta,
         ch_fai,
         ch_dict,
@@ -169,6 +216,18 @@ workflow GATK_CNV_SOMATIC {
         ch_common_snps_tbi
     )
     ch_versions = ch_versions.mix(COLLECTALLELICCOUNTS.out.versions.first())
+
+    // Unified allelic counts channel: [ meta, allelic_tsv ]
+    // (tumor + normal mixed, downstream filtered by meta.sample_type)
+    ch_all_allelic = COLLECTALLELICCOUNTS.out.allelic_counts
+        .mix(
+            ch_tumor_allelic_branch.precomputed
+                .map { meta, bam, bai, counts, allelic -> [ meta, allelic ] }
+        )
+        .mix(
+            ch_normal_allelic_branch.precomputed
+                .map { meta, bam, bai, allelic -> [ meta, allelic ] }
+        )
 
     // =========================================
     // 4. MODEL SEGMENTS (tumor with matched normal)
@@ -183,11 +242,11 @@ workflow GATK_CNV_SOMATIC {
     ch_tumor_denoised = GATK4_DENOISEREADCOUNTS.out.denoised
         .map { meta, file -> [ meta.id, meta, file ] }
 
-    ch_tumor_allelic = COLLECTALLELICCOUNTS.out.allelic_counts
+    ch_tumor_allelic = ch_all_allelic
         .filter { meta, file -> meta.sample_type == 'tumor' }
         .map { meta, file -> [ meta.id, file ] }
 
-    ch_normal_allelic = COLLECTALLELICCOUNTS.out.allelic_counts
+    ch_normal_allelic = ch_all_allelic
         .filter { meta, file -> meta.sample_type == 'normal' }
         .map { meta, file -> [ meta.patient_id, file ] }
 

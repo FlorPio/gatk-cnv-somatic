@@ -1,3 +1,4 @@
-sample,tumor_bam,normal_bam
-patient01,/path/to/bams/patient01_T.recal.bam,/path/to/bams/patient01_N.recal.bam
-patient02,/path/to/bams/patient02_T.recal.bam,/path/to/bams/patient02_N.recal.bam
+sample,tumor_bam,normal_bam,tumor_counts,tumor_allelic,normal_allelic
+EIW25_01_T12,/mnt/d/Exoma_run2/recalibrated/EIW25_01_T12/EIW25_01_T12.recal.bam,/mnt/d/Exoma_run2/recalibrated/EIW25_01_N11/EIW25_01_N11.recal.bam,,,
+EIW25_02_T01,,/mnt/d/Exoma_run2/recalibrated/EIW25_02_N01/EIW25_02_N01.recal.bam,/mnt/d/precomputed/EIW25_02_T01_tumor.hdf5,/mnt/d/precomputed/EIW25_02_T01_tumor.allelicCounts.tsv,
+EIW25_03_T01,,,/mnt/d/precomputed/EIW25_03_T01_tumor.hdf5,/mnt/d/precomputed/EIW25_03_T01_tumor.allelicCounts.tsv,/mnt/d/precomputed/EIW25_03_N01_normal.allelicCounts.tsv

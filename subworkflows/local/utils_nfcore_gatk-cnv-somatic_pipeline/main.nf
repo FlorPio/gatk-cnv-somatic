@@ -77,19 +77,40 @@ workflow PIPELINE_INITIALISATION {
     // Create channel from input file provided through params.input
     //
 
+    //
+    // Samplesheet columns (declared order in schema_input.json):
+    //   sample, tumor_bam, normal_bam, tumor_counts, tumor_allelic, normal_allelic
+    //
+    // Only `sample` is required. For each downstream step, the row must provide
+    // either the BAM or the corresponding precomputed file:
+    //   CollectReadCounts     → tumor_bam OR tumor_counts
+    //   CollectAllelicCounts  → tumor_bam OR tumor_allelic   (tumor)
+    //   CollectAllelicCounts  → normal_bam OR normal_allelic (normal)
+    //
     channel
         .fromList(samplesheetToList(params.input, "${projectDir}/assets/schema_input.json"))
         .map {
-            meta, tumor_bam, normal_bam ->
-            def tumor_bai  = file(tumor_bam).toString() + '.bai'
-            def normal_bai = file(normal_bam).toString() + '.bai'
-            return [
-                meta,
-                file(tumor_bam),
-                file(tumor_bai),
-                file(normal_bam),
-                file(normal_bai)
-            ]
+            meta, tumor_bam, normal_bam, tumor_counts, tumor_allelic, normal_allelic ->
+
+            def t_bam     = tumor_bam      ? file(tumor_bam)                                : []
+            def t_bai     = tumor_bam      ? file(file(tumor_bam).toString() + '.bai')      : []
+            def n_bam     = normal_bam     ? file(normal_bam)                               : []
+            def n_bai     = normal_bam     ? file(file(normal_bam).toString() + '.bai')     : []
+            def t_counts  = tumor_counts   ? file(tumor_counts)                             : []
+            def t_allelic = tumor_allelic  ? file(tumor_allelic)                            : []
+            def n_allelic = normal_allelic ? file(normal_allelic)                           : []
+
+            if (!t_bam && !t_counts) {
+                error("Sample '${meta.id}': must provide either 'tumor_bam' or 'tumor_counts' (read counts)")
+            }
+            if (!t_bam && !t_allelic) {
+                error("Sample '${meta.id}': must provide either 'tumor_bam' or 'tumor_allelic' (tumor allelic counts)")
+            }
+            if (!n_bam && !n_allelic) {
+                error("Sample '${meta.id}': must provide either 'normal_bam' or 'normal_allelic' (normal allelic counts)")
+            }
+
+            return [ meta, t_bam, t_bai, n_bam, n_bai, t_counts, t_allelic, n_allelic ]
         }
         .set { ch_samplesheet }
 

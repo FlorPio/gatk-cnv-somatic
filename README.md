@@ -57,18 +57,38 @@ docker rm cnv-refs-temp
 
 ### 2. Prepare Samplesheet
 
-Create a CSV file with your tumor-normal pairs:
+Create a CSV file with your tumor-normal pairs. The samplesheet supports **mixing BAMs with precomputed GATK outputs** on a per-row basis — useful when some samples already have read counts and/or allelic counts from a previous run.
 
 ```csv
-sample,tumor_bam,normal_bam
-Patient_01,/path/to/Patient_01_T01.recal.bam,/path/to/Patient_01_N01.recal.bam
-Patient_02,/path/to/Patient_02_T01.recal.bam,/path/to/Patient_02_N01.recal.bam
+sample,tumor_bam,normal_bam,tumor_counts,tumor_allelic,normal_allelic
+Patient_01,/path/to/Patient_01_T01.recal.bam,/path/to/Patient_01_N01.recal.bam,,,
+Patient_02,,/path/to/Patient_02_N01.recal.bam,/path/to/Patient_02_T01.hdf5,/path/to/Patient_02_T01.allelicCounts.tsv,
+Patient_03,,,/path/to/Patient_03_T01.hdf5,/path/to/Patient_03_T01.allelicCounts.tsv,/path/to/Patient_03_N01.allelicCounts.tsv
 ```
 
+**Columns:**
+
+| Column | Required? | Description |
+|--------|-----------|-------------|
+| `sample` | yes | Sample / patient ID (used as `meta.id`) |
+| `tumor_bam` | conditional | Tumor BAM. Required unless **both** `tumor_counts` and `tumor_allelic` are provided. |
+| `normal_bam` | conditional | Normal BAM. Required unless `normal_allelic` is provided. |
+| `tumor_counts` | optional | Precomputed tumor read counts (`.hdf5` from `CollectReadCounts`). Skips `CollectReadCounts` for this row. |
+| `tumor_allelic` | optional | Precomputed tumor allelic counts (`.tsv` from `CollectAllelicCounts`). Skips tumor `CollectAllelicCounts`. |
+| `normal_allelic` | optional | Precomputed normal allelic counts (`.tsv` from `CollectAllelicCounts`). Skips normal `CollectAllelicCounts`. |
+
+**Validation rules** (per row, enforced at pipeline init):
+- `tumor_bam` OR `tumor_counts` must be present (for read counts → denoising).
+- `tumor_bam` OR `tumor_allelic` must be present (for tumor allelic counts).
+- `normal_bam` OR `normal_allelic` must be present (for normal allelic counts).
+
+Leave a column empty (`,,`) to skip it.
+
 **Requirements:**
-- BAM files must be aligned to hg38 (main chromosomes only)
-- BAM files must be sorted and indexed (.bai)
-- Tumor and normal must be from the same patient
+- BAM files must be aligned to hg38 (main chromosomes only), sorted and indexed (`.bai`).
+- Tumor and normal must be from the same patient.
+- **Precomputed `tumor_counts` must use the same intervals (and binning/padding) as the Panel of Normals.** Otherwise `DenoiseReadCounts` will fail.
+- Precomputed `*_allelic.tsv` files must have been generated against the same `--common_snps` VCF.
 
 ### 3. Create params.json
 
@@ -157,7 +177,7 @@ results/
 
 | Parameter | Description |
 |-----------|-------------|
-| `--input` | Samplesheet CSV (sample, tumor_bam, normal_bam) |
+| `--input` | Samplesheet CSV (`sample` + optional `tumor_bam`, `normal_bam`, `tumor_counts`, `tumor_allelic`, `normal_allelic`) |
 | `--outdir` | Output directory |
 | `--fasta` | Reference genome FASTA (main chromosomes only) |
 | `--intervals` | Target intervals (`.bed` or `.interval_list`) |
