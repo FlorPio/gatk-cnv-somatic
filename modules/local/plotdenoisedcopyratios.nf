@@ -47,8 +47,7 @@ process PLOTDENOISEDCOPYRATIOS {
     stub:
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    touch ${prefix}_denoised.png
-    touch ${prefix}_standardized.png
+    touch ${prefix}.denoised.png
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
